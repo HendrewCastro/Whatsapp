@@ -1,4 +1,6 @@
-// index.js
+const swaggerJsDoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
+
 
 // Importa o framework Express para criar um servidor web
 const express = require('express');
@@ -9,12 +11,23 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 // Importa o pacote qrcode para gerar QR codes em imagens
 const qrcode = require('qrcode');
 
+
 // Importa módulos nativos do Node.js para manipulação de arquivos e caminhos
 const fs = require('fs');
 const path = require('path');
 
+const rootPath = path.join(__dirname, '.wwebjs_auth');
+
+if (fs.existsSync(rootPath)) {
+  fs.rmSync(rootPath, { recursive: true, force: true });
+  console.log('Todas as pastas de sessão foram apagadas.');
+} else {
+  console.log('Pasta de sessões não existe.');
+}
+
 // Cria uma instância do Express (nosso servidor)
 const app = express();
+
 
 // Define a porta que o servidor vai "escutar" (onde você acessa no navegador)
 const PORT = 3000;
@@ -27,11 +40,59 @@ const sessions = {};
 // Usamos isso para exibir o QR no navegador
 const sessionQRs = {};
 
-// ------------------------- ROTA PARA INICIAR UMA SESSÃO -------------------------
-app.get('/start/:sessionName', (req, res) => {
+const sessionContacts = {}
+
+
+
+app.use(express.json())
+
+
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+const API_KEY = process.env.GROQ_API_KEY;
+
+const swaggerOptions = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "API WhatsApp Web.js",
+      version: "1.0.0",
+      description: "API para gerenciar sessões WhatsApp com QR code e allowed contacts"
+    },
+    servers: [
+      { url: "http://localhost:3000" }
+    ]
+  },
+  apis: ["./Index.js"], 
+};
+
+const swaggerDocs = swaggerJsDoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
+
+
+
+/**
+ * @swagger
+ * /start/{sessionName}:
+ *   get:
+ *     summary: Inicia uma sessão do WhatsApp
+ *     parameters:
+ *       - in: path
+ *         name: sessionName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Nome da sessão
+ *     responses:
+ *       200:
+ *         description: Sessão iniciada com sucesso
+ */
+
+app.get('/start/:sessionName', async (req, res) => {
   // Pega o nome da sessão da URL, ex: /start/hendrew → sessionName = "hendrew"
   const { sessionName } = req.params;
-
+  
   // Verifica se já existe um client em memória com esse nome
   if (sessions[sessionName]) {
     return res.send(`Sessão "${sessionName}" já existe.`);
@@ -54,6 +115,46 @@ app.get('/start/:sessionName', (req, res) => {
     console.log(`Sessão ${sessionName} conectada!`);
   });
 
+  client.on('message',  async msg => {
+    var contacts = sessionContacts[sessionName] || []
+    const contact = await msg.getContact();
+    var chatId = msg.from
+    if (contacts.length === 0) return;
+    if (contacts.includes(contact.pushname)){
+      console.log(`mensagem para ${client.info.pushname} de ${contact.pushname}: ${msg.body}`)
+      try{
+        const resposta = await fetch(GROQ_API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization' : `Bearer ${API_KEY}`,
+            'Content-Type' : 'application/json'
+
+          },
+          body: JSON.stringify({
+            model: "openai/gpt-oss-20b",
+            messages: [
+              { role: "user", content: msg.body }
+            ]
+          })
+        });
+        const dados = await resposta.json();
+        console.log(dados)
+
+        const RespostaTxt = dados.choices[0].message.content //primeira choice, a parte de mensagens e a parte de content
+        
+        client.sendMessage(chatId, RespostaTxt)
+
+
+      }catch (err) {
+        console.error(err);
+        console.log("Erro ao chamar o Groq")
+      }
+
+
+
+    }
+  });
+
   // Inicializa o client (começa a conexão com o WhatsApp)
   client.initialize();
 
@@ -64,7 +165,27 @@ app.get('/start/:sessionName', (req, res) => {
   res.send(`Sessão "${sessionName}" iniciada! Use /qr/${sessionName} para pegar o QR.`);
 });
 
-// ------------------------- ROTA PARA PEGAR O QR CODE -------------------------
+
+/**
+ * @swagger
+ * /qr/{sessionName}:
+ *   get:
+ *     summary: Retorna o QR code da sessão
+ *     parameters:
+ *       - in: path
+ *         name: sessionName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Nome da sessão
+ *     responses:
+ *       200:
+ *         description: QR code retornado com sucesso
+ *         content:
+ *           text/html:
+ *                
+ */
+
 app.get('/qr/:sessionName', async (req, res) => {
   const { sessionName } = req.params;
 
@@ -83,7 +204,23 @@ app.get('/qr/:sessionName', async (req, res) => {
   res.send(`<h2>QR da sessão: ${sessionName}</h2><img src="${qrImage}"/>`);
 });
 
-// ------------------------- ROTA PARA VERIFICAR STATUS -------------------------
+
+/**
+ * @swagger
+ * /status/{sessionName}:
+ *   get:
+ *     summary: Retorna o status da sessão
+ *     parameters:
+ *       - in: path
+ *         name: sessionName
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Status da sessão
+ */
+
 app.get('/status/:sessionName', (req, res) => {
   const client = sessions[req.params.sessionName];
 
@@ -92,16 +229,69 @@ app.get('/status/:sessionName', (req, res) => {
 
   // Verifica se o client está pronto (client.info existe depois do 'ready')
   // Se estiver, retorna "conectado", se não, "desconectado"
-  res.send(`Sessão "${req.params.sessionName}" status: ${client.info ? 'conectado' : 'desconectado'}`);
+  res.send(`Sessão "${req.params.sessionName}" status: ${client.info ? 'conectado' : 'desconectado'}, Contatos Permitidos: ${sessionContacts[req.params.sessionName]}`)
+
 });
 
-// ------------------------- ROTA PARA APAGAR UMA SESSÃO -------------------------
+/**
+ * @swagger
+ * /AllowContacts/{sessionName}:
+ *   post:
+ *     summary: Define contatos permitidos para a sessão
+ *     parameters:
+ *       - in: path
+ *         name: sessionName
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: array
+ *             items:
+ *               type: string
+ *     responses:
+ *       200:
+ *         description: Allowed contacts atualizados
+ */
+
+
+app.post('/AllowContacts/:sessionName/', (req, res) => {
+  sessionContacts[req.params.sessionName] = req.body || []
+  res.send(`Allowed contacts da sessão "${req.params.sessionName}" atualizados!`);
+
+})
+
+/**
+ * @swagger
+ * /delete/{sessionName}:
+ *   get:
+ *     summary: Deleta a sessão do WhatsApp
+ *     parameters:
+ *       - in: path
+ *         name: sessionName
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Sessão apagada com sucesso
+ */
+
 app.get('/delete/:sessionName', async (req, res) => {
   const { sessionName } = req.params;
   const client = sessions[sessionName];
 
   // Se não existir client com esse nome, retorna erro
   if (!client) return res.send(`Sessão "${sessionName}" não existe.`);
+
+  try {
+    await client.destroy();
+  } catch (err) {
+    console.log('Erro ao destruir client:', err.message);
+  }
 
   // Encerra o client do WhatsApp e desconecta a sessão
   await client.destroy();
@@ -120,7 +310,6 @@ app.get('/delete/:sessionName', async (req, res) => {
   res.send(`Sessão "${sessionName}" apagada com sucesso!`);
 });
 
-// ------------------------- INICIA O SERVIDOR -------------------------
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
