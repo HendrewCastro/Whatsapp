@@ -40,17 +40,21 @@ const sessions = {};
 // Usamos isso para exibir o QR no navegador
 const sessionQRs = {};
 
+// Os contatos de cada sessao
 const sessionContacts = {}
 
 
-
+// Para mandar Json para a API
 app.use(express.json())
 
-
+// A URL da API
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
+// A Chave da API que esta no .env, Se nao tiver uma Crie no Groq e Escreva GROQ_API_KEY=xxxxx
+// SEM ; OU ESPAÇOS!!!
+
 const API_KEY = process.env.GROQ_API_KEY;
-console.log(API_KEY)
+
 
 const swaggerOptions = {
   definition: {
@@ -88,9 +92,9 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
  *         description: .
  */
 
-app.get('/Groq/:message', async (req, res) => {
-  var msg = req.params.message
-  console.log(`Bearer ${API_KEY}`)
+app.get('/Groq/:message', async (req, res) => { // Essa rota serve para testar a comunicação com o GROQ Use o api-docs de preferencia
+  var msg = req.params.message // Pega oq vc mandou pela rota
+  console.log(`Bearer ${API_KEY}`) 
   const resposta = await fetch(GROQ_API_URL, {
           method: 'POST',
           headers: {
@@ -101,15 +105,15 @@ app.get('/Groq/:message', async (req, res) => {
           body: JSON.stringify({
             model: "meta-llama/llama-4-scout-17b-16e-instruct",
             messages: [
-              { role: "user", content: msg }
+              { role: "user", content: msg } // Content é o que vai mandar para o groq
             ],
           })
         });
         const dados = await resposta.json();
-        console.log(dados)
+        console.log(dados) // Para testes
 
-        const RespostaTxt = dados.choices[0].message.content
-        console.log(RespostaTxt)
+        const RespostaTxt = dados.choices[0].message.content // Basicamente a resposta do Groq Tem um formato de Json com listas etc, usamos isso para resgatar somente a resposta
+        console.log(RespostaTxt) 
 
 })
 
@@ -132,7 +136,7 @@ app.get('/Groq/:message', async (req, res) => {
  *         description: Sessão iniciada com sucesso
  */
 
-app.get('/start/:sessionName', async (req, res) => {
+app.get('/start/:sessionName', async (req, res) => { 
   // Pega o nome da sessão da URL, ex: /start/hendrew → sessionName = "hendrew"
   const { sessionName } = req.params;
   
@@ -161,15 +165,15 @@ app.get('/start/:sessionName', async (req, res) => {
     console.log(`Sessão ${sessionName} conectada!`);
   });
 
-  client.on('error', (err) => console.error('Client error:', err));
+  client.on('error', (err) => console.error('Client error:', err)); //Manda o Erro no Console
 
-  client.on('message',  async msg => {
-    var contacts = sessionContacts[sessionName] || []
-    const contact = await msg.getContact();
-    var chatId = msg.from
-    if (contacts.length === 0) return;
-    if (contacts.includes(contact.pushname)){
-      console.log(`mensagem para ${client.info.pushname} de ${contact.pushname}: ${msg.body}`)
+  client.on('message',  async msg => { //Quando alguem mandar uma mensagem
+    var contacts = sessionContacts[sessionName] || [] //Verifica se O User Adicionou contatos permitidos, se não ele pega uma lista vazia
+    const contact = await msg.getContact(); //pegar dados do contato da pessoa que mandou a mensagem
+    var chatId = msg.from //De quem veio a mensagem
+    if (contacts.length === 0) return; // Se não tiver nenhum contato na lista ele volta
+    if (contacts.includes(contact.pushname)){ // Se na Lista de contatos tiver o nome do contato ele continua
+      console.log(`mensagem para ${client.info.pushname} de ${contact.pushname}: ${msg.body}`) // Mensagem para o cliente (User) de (Quem mandou a mensagem): (Conteudo da mensagem)
       try{
         const resposta = await fetch(GROQ_API_URL, {
           method: 'POST',
@@ -188,9 +192,9 @@ app.get('/start/:sessionName', async (req, res) => {
         const dados = await resposta.json();
         console.log(dados)
 
-        const RespostaTxt = dados.choices[0].message.content //primeira choice, a parte de mensagens e a parte de content
+        const RespostaTxt = dados.choices[0].message.content // Primeira choice, a parte de mensagens e a parte de content
         
-        client.sendMessage(chatId, RespostaTxt)
+        client.sendMessage(chatId, RespostaTxt) // Manda uma mensagem para a pessoa que mandou com o texto do Groq
 
 
       }catch (err) {
