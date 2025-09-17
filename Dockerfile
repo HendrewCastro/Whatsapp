@@ -45,7 +45,6 @@ EXPOSE 3000
 
 # Define variável de ambiente (você pode sobrescrever no docker-compose) 
 
-ENV GROQ_API_KEY="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" 
 
 # Comando para iniciar o app 
 

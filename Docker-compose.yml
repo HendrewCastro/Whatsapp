@@ -6,9 +6,8 @@ services:
     container_name: whatsapp-api
     ports:
       - "3000:3000"
-    environment:
-      - GROQ_API_KEY="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" 
-     
+    env_file:
+      - .env
     volumes:
       - ./wwebjs_auth:/app/wwebjs_auth # mantém sessão do WhatsApp entre reinícios
       - ./:/app

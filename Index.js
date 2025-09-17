@@ -50,6 +50,7 @@ app.use(express.json())
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 const API_KEY = process.env.GROQ_API_KEY;
+console.log(API_KEY)
 
 const swaggerOptions = {
   definition: {
@@ -69,6 +70,48 @@ const swaggerOptions = {
 const swaggerDocs = swaggerJsDoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
+
+/**
+ * @swagger
+ * /Groq/{message}:
+ *   get:
+ *     summary: Chama o Groq
+ *     parameters:
+ *       - in: path
+ *         name: message
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Mensagem
+ *     responses:
+ *       200:
+ *         description: .
+ */
+
+app.get('/Groq/:message', async (req, res) => {
+  var msg = req.params.message
+  console.log(`Bearer ${API_KEY}`)
+  const resposta = await fetch(GROQ_API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization' : `Bearer ${API_KEY}`,
+            'Content-Type' : 'application/json'
+
+          },
+          body: JSON.stringify({
+            model: "meta-llama/llama-4-scout-17b-16e-instruct",
+            messages: [
+              { role: "user", content: msg }
+            ],
+          })
+        });
+        const dados = await resposta.json();
+        console.log(dados)
+
+        const RespostaTxt = dados.choices[0].message.content
+        console.log(RespostaTxt)
+
+})
 
 
 
@@ -136,10 +179,10 @@ app.get('/start/:sessionName', async (req, res) => {
 
           },
           body: JSON.stringify({
-            model: "openai/gpt-oss-20b",
+            model: "meta-llama/llama-4-scout-17b-16e-instruct",
             messages: [
               { role: "user", content: msg.body }
-            ]
+            ],
           })
         });
         const dados = await resposta.json();
@@ -307,6 +350,7 @@ app.get('/delete/:sessionName', async (req, res) => {
     delete sessionQRs[sessionName];
 
     // Apaga a pasta do LocalAuth no disco para essa sessão
+
     const sessionPath = path.join(__dirname, 'wwebjs_auth', 'local', sessionName);
     if (fs.existsSync(sessionPath)) {
      fs.rmSync(sessionPath, { recursive: true, force: true });
@@ -320,10 +364,9 @@ app.get('/delete/:sessionName', async (req, res) => {
     res.send(`Erro ao apagar ${sessionName}: ${err.message}`)
   }
 
- 
 
-  
 });
+
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
