@@ -1,4 +1,4 @@
-const swaggerJsDoc = require('swagger-jsdoc');
+const swaggerJsDoc = require('swagger-jsdoc'); //Swagger é usado para A UI da API
 const swaggerUi = require('swagger-ui-express');
 
 
@@ -16,9 +16,9 @@ const qrcode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
 
-const rootPath = path.join(__dirname, '.wwebjs_auth');
+const rootPath = path.join(__dirname, '.wwebjs_auth'); //apth.join junta caminhos, ex: users/teste/Whatsapp, _Dirname é a pasta em que o index.js está
 
-if (fs.existsSync(rootPath)) {
+if (fs.existsSync(rootPath)) { //Verifica se o caminho existe
   fs.rmSync(rootPath, { recursive: true, force: true });
   console.log('Todas as pastas de sessão foram apagadas.');
 } else {
@@ -101,6 +101,9 @@ app.get('/start/:sessionName', async (req, res) => {
   // Cria um novo client do WhatsApp usando LocalAuth
   // LocalAuth salva a sessão no disco, assim não precisa escanear QR toda hora
   const client = new Client({
+    puppeteer:{
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    },
     authStrategy: new LocalAuth({ clientId: sessionName })
   });
 
@@ -114,6 +117,8 @@ app.get('/start/:sessionName', async (req, res) => {
   client.on('ready', () => {
     console.log(`Sessão ${sessionName} conectada!`);
   });
+
+  client.on('error', (err) => console.error('Client error:', err));
 
   client.on('message',  async msg => {
     var contacts = sessionContacts[sessionName] || []
@@ -288,26 +293,36 @@ app.get('/delete/:sessionName', async (req, res) => {
   if (!client) return res.send(`Sessão "${sessionName}" não existe.`);
 
   try {
-    await client.destroy();
+
+    if (!client.info) {
+      return res.status(400).send(`Sessão "${sessionName}" ainda não está pronta. Aguarde a conexão.`);
+    }
+
+    if (client.isConnected()) {
+      await client.logout(); // Encerra a sessão do WhatsApp de forma limpa
+    }
+    await client.destroy(); 
+    // Remove o client e o QR do objeto em memória
+    delete sessions[sessionName];
+    delete sessionQRs[sessionName];
+
+    // Apaga a pasta do LocalAuth no disco para essa sessão
+    const sessionPath = path.join(__dirname, 'wwebjs_auth', 'local', sessionName);
+    if (fs.existsSync(sessionPath)) {
+     fs.rmSync(sessionPath, { recursive: true, force: true });
+    }
+
+    // Retorna no navegador que a sessão foi apagada
+    res.send(`Sessão "${sessionName}" apagada com sucesso!`);
+
   } catch (err) {
     console.log('Erro ao destruir client:', err.message);
+    res.send(`Erro ao apagar ${sessionName}: ${err.message}`)
   }
 
-  // Encerra o client do WhatsApp e desconecta a sessão
-  await client.destroy();
+ 
 
-  // Remove o client e o QR do objeto em memória
-  delete sessions[sessionName];
-  delete sessionQRs[sessionName];
-
-  // Apaga a pasta do LocalAuth no disco para essa sessão
-  const sessionPath = path.join(__dirname, 'wwebjs_auth', 'local', sessionName);
-  if (fs.existsSync(sessionPath)) {
-    fs.rmSync(sessionPath, { recursive: true, force: true });
-  }
-
-  // Retorna no navegador que a sessão foi apagada
-  res.send(`Sessão "${sessionName}" apagada com sucesso!`);
+  
 });
 
 app.listen(PORT, () => {
