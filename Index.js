@@ -117,7 +117,48 @@ app.get('/Groq/:message', async (req, res) => { // Essa rota serve para testar a
 
 })
 
+/**
+ * @swagger
+ * /Lista/{sessionName}:
+ *   post:
+ *     summary: Envia mensagem para a fila de uma sessão
+ *     parameters:
+ *       - in: path
+ *         name: sessionName
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Nome da sessão
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               message:
+ *                 type: string
+ *                 example: "Olá, teste"
+ *     
+ */
 
+
+app.post('/Lista/:sessionName', async (req, res) => { // Essa rota serve para testar a comunicação com o GROQ Use o api-docs de preferencia
+  var msg = req.body // Pega oq vc mandou pela rota
+  var sessionName = req.params.sessionName
+  const resposta = await fetch(`http://chanel:3001/send/${sessionName}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, // importante
+      body: JSON.stringify({
+        message: msg,
+        session: sessionName
+      })
+    });
+
+     const dados = await resposta.json();
+     console.log(dados)
+
+})
 
 /**
  * @swagger
@@ -172,8 +213,8 @@ app.get('/start/:sessionName', async (req, res) => {
     const contact = await msg.getContact(); //pegar dados do contato da pessoa que mandou a mensagem
     var chatId = msg.from //De quem veio a mensagem
     if (contacts.length === 0) return; // Se não tiver nenhum contato na lista ele volta
-    if (contacts.includes(contact.pushname)){ // Se na Lista de contatos tiver o nome do contato ele continua
-      console.log(`mensagem para ${client.info.pushname} de ${contact.pushname}: ${msg.body}`) // Mensagem para o cliente (User) de (Quem mandou a mensagem): (Conteudo da mensagem)
+    if (contacts.includes(contact.name)){ // Se na Lista de contatos tiver o nome do contato ele continua
+      console.log(`mensagem para ${client.info.pushname} de ${contact.name}: ${msg.body}`) // Mensagem para o cliente (User) de (Quem mandou a mensagem): (Conteudo da mensagem)
       try{
         const resposta = await fetch(GROQ_API_URL, {
           method: 'POST',

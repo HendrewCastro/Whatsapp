@@ -42,6 +42,7 @@ COPY . .
 # Expõe a porta que o Express vai rodar 
 
 EXPOSE 3000 
+EXPOSE 3001
 
 # Define variável de ambiente (você pode sobrescrever no docker-compose) 
 

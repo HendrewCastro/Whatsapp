@@ -1,14 +1,25 @@
 version: "3.9"
 
 services:
-  whatsapp-api:
+  index:
     build: .
-    container_name: whatsapp-api
+    container_name: index_app
+    command: node Index.js
     ports:
       - "3000:3000"
     env_file:
       - .env
     volumes:
-      - ./wwebjs_auth:/app/wwebjs_auth # mantém sessão do WhatsApp entre reinícios
+      - ./wwebjs_auth:/app/wwebjs_auth
+      - ./:/app
+      - /app/node_modules
+
+  chanel:
+    build: .
+    container_name: chanel_app
+    command: node Chanel.js
+    ports:
+      - "3001:3001"
+    volumes:
       - ./:/app
       - /app/node_modules

@@ -41,6 +41,7 @@ Este projeto integra o Groq com o WhatsApp para permitir respostas automáticas 
    - Volte para [http://localhost:3000/api-docs](http://localhost:3000/api-docs).
    - Use o endpoint `/allowContacts/:sessionName` para adicionar contatos à lista de permitidos.
    - Adicione os nomes dos contatos desejados à lista.
+   - Ele vai considerar o nome que você colocou no contato da pessoa.
 
 8. **Respostas Automáticas**:
    - Quando um contato da lista de permitidos enviar uma mensagem, o Groq responderá automaticamente.
