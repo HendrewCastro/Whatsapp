@@ -46,6 +46,8 @@ Este projeto integra o Groq com o WhatsApp para permitir respostas automáticas 
 8. **Respostas Automáticas**:
    - Quando um contato da lista de permitidos enviar uma mensagem, o Groq responderá automaticamente.
    - **Importante**: Não abra ou interaja com a conversa no WhatsApp enquanto a automação estiver ativa, pois isso pode interferir no funcionamento do bot.
+   - O bot vai juntar ate 50 mensagens se eles tiverem até 20s entre elas
+   - O bot vai apagar a primeira mensagem quando as mensagens passarem de 50
 
 ## Rotas Disponíveis da API
 
