@@ -135,27 +135,47 @@ app.get('/Groq/:message', async (req, res) => { // Essa rota serve para testar a
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - message
+ *               - session
+ *               - API_KEY
+ *               - usuario
  *             properties:
  *               message:
  *                 type: string
+ *                 description: A mensagem a ser enfileirada para a sessão
  *                 example: "Olá, teste"
- *     
+ *               session:
+ *                 type: string
+ *                 description: O nome da sessão para a qual a mensagem será enviada
+ *                 example: "teste"
+ *               API_KEY:
+ *                 type: string
+ *                 description: Chave de API para autenticação na API do Groq
+ *                 example: "gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+ *               usuario:
+ *                 type: string
+ *                 description: Identificador do usuário ou chat 
+ *                 example: "123456789@c.us"
  */
 
 
 app.post('/Lista/:sessionName', async (req, res) => { // Essa rota serve para testar a comunicação com o GROQ Use o api-docs de preferencia
   var msg = req.body // Pega oq vc mandou pela rota
+  console.log(msg)
   var sessionName = req.params.sessionName
   const resposta = await fetch(`http://chanel:3001/send/${sessionName}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }, // importante
       body: JSON.stringify({
-        message: msg,
-        session: sessionName
+        message: msg.message,
+        session: sessionName,
+        API_KEY: API_KEY,
+        usuario: msg.from
       })
     });
 
-     const dados = await resposta.json();
+     const dados = await resposta.text()
      console.log(dados)
 
 })
@@ -216,25 +236,21 @@ app.get('/start/:sessionName', async (req, res) => {
     if (contacts.includes(contact.name)){ // Se na Lista de contatos tiver o nome do contato ele continua
       console.log(`mensagem para ${client.info.pushname} de ${contact.name}: ${msg.body}`) // Mensagem para o cliente (User) de (Quem mandou a mensagem): (Conteudo da mensagem)
       try{
-        const resposta = await fetch(GROQ_API_URL, {
+        const resposta = await fetch(`http://chanel:3001/send/${sessionName}`, {
           method: 'POST',
-          headers: {
-            'Authorization' : `Bearer ${API_KEY}`,
-            'Content-Type' : 'application/json'
-
-          },
+          headers: { 'Content-Type': 'application/json' }, // importante
           body: JSON.stringify({
-            model: "meta-llama/llama-4-scout-17b-16e-instruct",
-            messages: [
-              { role: "user", content: msg.body }
-            ],
-          })
-        });
-        const dados = await resposta.json();
-        console.log(dados)
+            message: msg.body,
+            session: sessionName,
+            API_KEY: API_KEY,
+            usuario: chatId
+      })
+    });
 
-        const RespostaTxt = dados.choices[0].message.content // Primeira choice, a parte de mensagens e a parte de content
-        
+       
+     
+
+        var RespostaTxt = await resposta.text()
         client.sendMessage(chatId, RespostaTxt) // Manda uma mensagem para a pessoa que mandou com o texto do Groq
 
 
